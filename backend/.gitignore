@@ -1,0 +1,9 @@
+node_modules/
+.env
+.data_key
+CONTRASENA_ADMIN_INICIAL.txt
+orangematch.db
+orangematch.db-shm
+orangematch.db-wal
+data/
+*.log

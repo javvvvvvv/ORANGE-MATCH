@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="/assets/orange-crew-icon.svg" />
+<title>Orange Match</title>
+<!-- XLSX y ExcelJS se mantienen como globales de navegador (no tienen build
+     propio en este proyecto): se usan como window.XLSX / window.ExcelJS
+     directamente en src/lib y en varios componentes. -->
+<script src="/libs/xlsx.min.js"></script>
+<script src="/libs/exceljs.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

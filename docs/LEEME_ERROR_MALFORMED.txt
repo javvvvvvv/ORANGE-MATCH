@@ -1,0 +1,18 @@
+ERROR: database disk image is malformed
+========================================
+
+Causa mas frecuente:
+- El servidor estaba abierto mientras se copiaba el .db
+- Quedaron archivos basura: orangematch.db-wal y orangematch.db-shm
+  de una version anterior, mezclados con el .db nuevo
+
+Solucion (en orden):
+1. Cierra COMPLETAMENTE el servidor Node (todas las ventanas)
+2. En la carpeta de la app, BORRA si existen:
+     - orangematch.db-wal
+     - orangematch.db-shm
+3. Sustituye orangematch.db por el del ZIP nuevo
+4. Sustituye server.js e index.html (public/index.html)
+5. Arranca de nuevo: node server.js
+
+NO copies el .db con el servidor en marcha.
