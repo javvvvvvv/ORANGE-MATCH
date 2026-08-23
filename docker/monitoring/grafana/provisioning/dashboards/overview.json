@@ -1,0 +1,139 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "orange-match-overview",
+    "title": "Orange Match - Overview",
+    "tags": ["orange-match", "overview"],
+    "timezone": "America/Mexico_City",
+    "schemaVersion": 30,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "type": "stat",
+        "title": "Request Rate",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "req/s"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "type": "stat",
+        "title": "Error Rate",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "errors/s"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 0.1 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "graph",
+        "title": "Response Time (95th percentile)",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          }
+        ],
+        "yAxes": [{ "format": "s" }]
+      },
+      {
+        "id": 4,
+        "type": "graph",
+        "title": "Queue Status",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          {
+            "expr": "bull_queue_waiting_count",
+            "legendFormat": "{{queue}} - waiting"
+          },
+          {
+            "expr": "bull_queue_active_count",
+            "legendFormat": "{{queue}} - active"
+          },
+          {
+            "expr": "bull_queue_failed_count",
+            "legendFormat": "{{queue}} - failed"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "type": "stat",
+        "title": "Memory Usage",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "MB"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "type": "stat",
+        "title": "Active Connections",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 12 },
+        "targets": [
+          {
+            "expr": "nodejs_eventloop_lag_seconds",
+            "legendFormat": "lag"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "type": "table",
+        "title": "Backup Status",
+        "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "backup_failures_total",
+            "legendFormat": "Failures"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "type": "alertlist",
+        "title": "Active Alerts",
+        "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+        "showOptions": {
+          "sortOrder": "severity",
+          "stateFilter": ["firing", "pending"]
+        }
+      }
+    ]
+  }
+}

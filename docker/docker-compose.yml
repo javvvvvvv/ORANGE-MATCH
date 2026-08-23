@@ -1,0 +1,218 @@
+# Docker Compose para Orange Match (producción con monitoreo)
+# ============================================================================
+# Orquesta backend, Redis, colas, monitoreo y volúmenes persistentes.
+# Usa este archivo para deploy en servidores con Docker.
+# ============================================================================
+
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: orange-redis
+    restart: unless-stopped
+    volumes:
+      - orange-redis-data:/data
+    networks:
+      - orange-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  orange-match:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: orange-match:latest
+    container_name: orange-match
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:?Error: JWT_SECRET no definido}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:?Error: DB_ENCRYPTION_KEY no definida}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://tudominio.com}
+      - HAMACHI_IP=${HAMACHI_IP:-}
+
+    volumes:
+      - orange-db:/app/backend/orangematch.db
+      - orange-data:/app/backend/data
+      - ${DB_KEY_FILE:-./.db_key}:/app/backend/.db_key:ro
+      - orange-logs:/app/backend/logs
+
+    networks:
+      - orange-network
+      - monitoring-network
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  email-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: orange-email-worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: node backend/src/core/queues/workers/emailWorker.js
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+    networks:
+      - orange-network
+    volumes:
+      - orange-logs:/app/backend/logs
+
+  backup-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: orange-backup-worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: node backend/src/core/queues/workers/backupWorker.js
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - orange-network
+    volumes:
+      - orange-backups:/app/backend/backups
+      - orange-logs:/app/backend/logs
+
+  export-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: orange-export-worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: node backend/src/core/queues/workers/exportWorker.js
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - orange-network
+    volumes:
+      - orange-exports:/app/backend/exports
+      - orange-logs:/app/backend/logs
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: orange-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - orange-prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring-network
+    ports:
+      - "9090:9090"
+    depends_on:
+      - orange-match
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: orange-grafana
+    restart: unless-stopped
+    volumes:
+      - orange-grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    networks:
+      - monitoring-network
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: orange-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    networks:
+      - monitoring-network
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+
+networks:
+  orange-network:
+    driver: bridge
+  monitoring-network:
+    driver: bridge
+
+volumes:
+  orange-db:
+    name: orange-match-database
+  orange-data:
+    name: orange-match-data
+  orange-logs:
+    name: orange-match-logs
+  orange-redis-data:
+    name: orange-match-redis
+  orange-backups:
+    name: orange-match-backups
+  orange-exports:
+    name: orange-match-exports
+  orange-prometheus-data:
+    name: orange-match-prometheus
+  orange-grafana-data:
+    name: orange-match-grafana

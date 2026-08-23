@@ -34,14 +34,20 @@ import anexoConfigRoutes from "./src/api/routes/anexoConfig.js";
 import backupsRoutes from "./src/api/routes/backups.js";
 import licenciaRoutes from "./src/api/routes/licencia.js";
 import logsRoutes from "./src/api/routes/logs.js";
+import twoFactorRoutes from "./src/api/routes/2fa.js";
+
+import { enforceHttps, securityHeaders } from "./src/middlewares/security.js";
+import { require2FA } from "./src/middlewares/twoFactorAuth.js";
 
 const app = express();
 
+// Middlewares de seguridad - HTTPS forzado en producción + cabeceras
+app.use(enforceHttps());
+app.use(securityHeaders());
+
 app.use(helmet({
-  // Sin HTTPS todavía (Hamachi/red local): si se activa contentSecurityPolicy
-  // con su configuración por defecto o strictTransportSecurity, el navegador
-  // truena con ERR_SSL_PROTOCOL_ERROR. En cuanto haya HTTPS real (Oracle
-  // Cloud + Caddy), se puede volver a activar sin problema.
+  // Con los middlewares de seguridad ya aplicados, HSTS se maneja allí.
+  // CSP se mantiene flexible para desarrollo, se endurece en producción con HTTPS real.
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -55,7 +61,7 @@ app.use(helmet({
       formAction: ["'self'"]
     }
   },
-  strictTransportSecurity: false
+  strictTransportSecurity: false // Ya lo aplica securityHeaders() en producción
 }));
 
 // CORS: por defecto refleja cualquier origen (modo desarrollo/Hamachi). En
@@ -81,9 +87,16 @@ app.use("/api/tarifas-isr", tarifasIsrRoutes);
 app.use("/api/anexo-config", anexoConfigRoutes);
 app.use("/api/backups", backupsRoutes);
 
+// 2FA routes (debe ir antes del check de licencia para permitir setup)
+app.use("/api/2fa", twoFactorRoutes);
+
 // Verificar licencia en cada request de /api (excepto login, backups y la
 // propia ruta de licencia — ver core/licenciaService.js)
 app.use("/api", checkLicencia);
+
+// Middleware 2FA para administradores en rutas críticas (después de auth)
+app.use("/api/users", require2FA());
+app.use("/api/backups", require2FA());
 
 app.use("/api/licencia", licenciaRoutes);
 app.use("/api/logs", logsRoutes);

@@ -1,26 +1,56 @@
+```
+# Dependencies
 node_modules/
-**/node_modules/
-.env
-**/.env
-.env.*
-!.env.example
-**/.env.*
-!**/.env.example
-frontend/dist/
-**/dist/
-coverage/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.python-version
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Logs
 *.log
+
+# Environment variables
+.env
+.env.local
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 *.tmp
-*.bak
-*.sqlite-shm
-*.sqlite-wal
-backend/.data_key
-backend/.db_key
-backend/orangematch.db
-backend/orangematch.db.antes-de-cifrar
-backend/orangematch.db-wal
-backend/orangematch.db-shm
-backend/data/
-backend/CONTRASENA_ADMIN_INICIAL.txt
+
+# Build outputs
+dist/
+build/
+target/
+.nyc_output/
+coverage/
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Docker
+.dockerenv
+
+# PM2
+.pm2/
+
+# Backup files
+*.bak
+*.backup
+```
